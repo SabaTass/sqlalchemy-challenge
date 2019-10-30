@@ -49,11 +49,10 @@ def welcome():
     <br>
     <br>
    
-    <a href="/api/v1.0/2017-01-01">/api/v1.0/2017-01-01 </a> <h5>All dates greater than the start Date of the trip (date, minimum Temp, Avg Tempeerature, Maximum Temperature)</h5>
+    <a href="/api/v1.0/2017-01-01">/api/v1.0/2017-01-01 </a> 
     <br>
 
-    <a href="/api/v1.0/2017-01-10/2017-01-20">/api/v1.0/2017-01-10/2017-01-20 </a> <h5>Trip Duration (dates, minimum Temperature, Avg Temperature, Maximum Temperature)</h5>
-    
+    <a href="/api/v1.0/2017-01-10/2017-01-20">/api/v1.0/2017-01-10/2017-01-20 </a> 
     </html> """
 
 @app.route("/api/v1.0/precipitation")
@@ -77,19 +76,20 @@ def precipitation():
 
 @app.route("/api/v1.0/stations")
 def stations(): 
+    """Return a JSON list of All Stataions and their Names."""
     session = Session(engine)
     #Query for all stations
-    all_stations =  session.query(Measurement.station).group_by(Measurement.station).all()
-    stations_list = list(np.ravel(all_stations))
+    all_stations =  session.query(Station.station, Station.name ).all()
+    session.close()
     #Putting in a Dictionary
     station_dict = []
-    for stations in stations_list:
-        station= {}
-        station["station"] = stations
-        station_dict.append(station)
+    for station, name in all_stations:
+        st= {}
+        st["station"] = station
+        st["name"]= name
+        station_dict.append(st)
     #Returning a JSON list of stations from the dataset.
     return jsonify(station_dict)
-
 
 @app.route("/api/v1.0/tobs")
 def tobs(): 
@@ -113,21 +113,45 @@ def start(start=None):
     """Return a JSON list of the minimum temperature, the average temperature, and the max temperature for a given start or start-end range."""
     session = Session(engine)
     #query for the first day of trip and calculations for min, max, avg according to dates
-    start= session.query(Measurement.date, func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)).filter(Measurement.date >= start).group_by(Measurement.date).all()
-   
+    start_date = dt.datetime.strptime(start, '%Y-%m-%d')
+
+    trip= session.query(Measurement.date, func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)).filter(Measurement.date >= start_date).group_by(Measurement.date).all()
+    session.close()
+    
+    #Getting results from query into a list
+    start_list = []
+    for start_dates in trip:
+        st={}
+        st["Date"] = start_dates[0]
+        st["Min Temp"] = start_dates[1]
+        st["Avg Temp"]= start_dates[2]
+        st["Max Temp"]= start_dates[3]
+        start_list.append(st)
     #Return a JSON list of the minimum temperature, the average temperature, and the max temperature for a given start or start-end range.
-    return jsonify(start)
+    return jsonify(start_list)
 
 @app.route("/api/v1.0/<start>/<end>")
 def start_end(start=None, end=None):
     """Return a JSON list of calculations of calculate TMIN, TAVG, and TMAX for all dates greater than and equal to the start date"""
+    start_date = dt.datetime.strptime(start, '%Y-%m-%d')
+    end_date = dt.datetime.strptime(end, "%Y-%m-%d")
     
     session = Session(engine)
     
     #query for the whole trip duration and alculations for min, max, avg for the whole duration. 
-    dates = session.query(Measurement.date, func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)).filter(Measurement.date >= start).filter(Measurement.date <= end).group_by(Measurement.date).all()
-    dates_list = list(dates)
+    dates = session.query(Measurement.date, func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)).filter(Measurement.date >= start_date).filter(Measurement.date <= end_date).group_by(Measurement.date).all()
     
+    session.close()
+    # Create a list to hold results
+    dates_list = []
+    for date in dates:
+        l = {}
+        l["Date"] = date[0]
+        l["MIN Temp"] = date[1]
+        l["Avg Temp"] = date[2]
+        l["Max Temp"] = date[3]
+        dates_list.append(l)
+
     #Return a JSON list of the minimum temperature, the average temperature, and the max temperature for a given start or start-end range.
     
     return jsonify(dates_list)
